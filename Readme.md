@@ -1,7 +1,7 @@
 ## How to run this code
 navigate to
 `
-cd C:\Users\Suhana K B\student-proctoring>
+cd C:student-proctoring>
 `
 
 `
