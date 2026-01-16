@@ -3,6 +3,9 @@ navigate to
 `
 cd C:student-proctoring>
 `
+`
+npm install
+`
 
 `
 npm start
