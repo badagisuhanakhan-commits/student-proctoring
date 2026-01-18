@@ -1,52 +1,147 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSocket } from "../context/SocketContext";
 import { useUser } from "../context/UserContext";
+import {
+  Box,
+  Button,
+  Input,
+  VStack,
+  HStack,
+  Text,
+  IconButton,
+  Collapse,
+} from "@chakra-ui/react";
+import { ChatIcon, CloseIcon } from "@chakra-ui/icons";
 
 const FacultyChat = () => {
-    const { user } = useUser();
-    const socket = useSocket();
-    const [input, setInput] = useState("");
-    const [messages, setMessages] = useState([]);
+  const { user } = useUser();
+  const socket = useSocket();
+  const [input, setInput] = useState("");
+  const [messages, setMessages] = useState([]);
+  const [isOpen, setIsOpen] = useState(false);
 
-    useEffect(() => {
-        if (!socket) return;
+  const messagesEndRef = useRef(null);
 
-        const handleMessage = ({ message, sender }) => {
-            setMessages(prev => [...prev, { message, sender }]);
-        };
+  // Auto-scroll to bottom when new message arrives
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
-        socket.on("chat-message", handleMessage);
+  useEffect(scrollToBottom, [messages]);
 
-        return () => socket.off("chat-message", handleMessage);
-    }, [socket]);
+  // Listen for incoming messages
+  useEffect(() => {
+    if (!socket) return;
 
-    const sendMessage = () => {
-        if (!input.trim()) return;
-        // socket.emit("chat-to-students", { message: input, facultyName: user.name });
-        socket.emit("chat-to-all-faculty", { message: input, sender: user.name });
+    const handleMessage = ({ message, sender }) => {
+      setMessages((prev) => [...prev, { message, sender }]);
 
-        setMessages((prev) => [...prev, { sender: user.name, message: input }]);
-        setInput("");
+      // Open chat automatically if new message is from other faculty
+      if (sender !== user.name) {
+        setIsOpen(true);
+      }
     };
 
-    return (
-        <div style={{ marginTop: "20px" }}>
-            <h4>Class Chat</h4>
-            <div style={{ height: "150px", overflowY: "auto", border: "1px solid gray", padding: "5px" }}>
-                {messages.map((m, idx) => (
-                    <div key={idx}><b>{m.sender}:</b> {m.message}</div>
-                ))}
-            </div>
-            <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Type message..."
-                style={{ width: "70%" }}
+    socket.on("chat-message", handleMessage);
+
+    return () => socket.off("chat-message", handleMessage);
+  }, [socket, user.name]);
+
+  // Send message
+  const sendMessage = useCallback(() => {
+    if (!input.trim()) return;
+    socket.emit("chat-to-all-faculty", { message: input, sender: user.name });
+
+    setMessages((prev) => [...prev, { sender: user.name, message: input }]);
+    setInput("");
+  }, [input, socket, user.name]);
+
+  return (
+    <>
+      {/* Chat Button */}
+      <IconButton
+        icon={<ChatIcon />}
+        colorScheme="teal"
+        position="fixed"
+        bottom="20px"
+        right="20px"
+        borderRadius="full"
+        size="lg"
+        onClick={() => setIsOpen((prev) => !prev)}
+        zIndex={1000}
+      />
+
+      {/* Chat Popup */}
+      <Collapse in={isOpen} animateOpacity>
+        <Box
+          position="fixed"
+          bottom="70px"
+          right="20px"
+          w="300px"
+          maxH="400px"
+          bg="white"
+          boxShadow="lg"
+          rounded="md"
+          display="flex"
+          flexDirection="column"
+          zIndex={1000}
+        >
+          {/* Header */}
+          <HStack
+            justifyContent="space-between"
+            bg="teal.500"
+            color="white"
+            p={2}
+            borderTopRadius="md"
+          >
+            <Text fontWeight="bold">Class Chat</Text>
+            <IconButton
+              icon={<CloseIcon />}
+              size="sm"
+              variant="ghost"
+              color="white"
+              onClick={() => setIsOpen(false)}
             />
-            <button onClick={sendMessage} style={{ width: "25%" }}>Send</button>
-        </div>
-    );
+          </HStack>
+
+          {/* Messages */}
+          <Box
+            flex="1"
+            p={2}
+            overflowY="auto"
+            borderBottom="1px solid #eee"
+            bg="gray.50"
+          >
+            {messages.map((m, idx) => (
+              <Box key={idx} mb={2}>
+                <Text fontSize="sm">
+                  <b>{m.sender}:</b> {m.message}
+                </Text>
+              </Box>
+            ))}
+            {/* Scroll target */}
+            <div ref={messagesEndRef} />
+          </Box>
+
+          {/* Input */}
+          <HStack p={2} spacing={2}>
+            <Input
+              size="sm"
+              placeholder="Type message..."
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") sendMessage();
+              }}
+            />
+            <Button size="sm" colorScheme="teal" onClick={sendMessage}>
+              Send
+            </Button>
+          </HStack>
+        </Box>
+      </Collapse>
+    </>
+  );
 };
 
 export default FacultyChat;

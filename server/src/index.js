@@ -11,9 +11,11 @@ import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
 
 const app = express();
-app.use(cors({
-  origin: "*"
-}));
+app.use(
+  cors({
+    origin: "*",
+  })
+);
 app.use(express.json());
 
 connectDB();
@@ -22,7 +24,7 @@ app.use("/api/auth", authRoutes);
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
-const students = new Map();  // socketId -> { userId, name }
+const students = new Map(); // socketId -> { userId, name }
 const faculties = new Map(); // socketId -> { userId, name }
 
 io.on("connection", (socket) => {
@@ -45,26 +47,34 @@ io.on("connection", (socket) => {
       });
 
       // Also send faculty socket ID to student
-      socket.emit("faculty-available", { facultySocketId: fid, facultyName: f.name });
+      socket.emit("faculty-available", {
+        facultySocketId: fid,
+        facultyName: f.name,
+      });
     });
   });
-
 
   socket.on("join-faculty", ({ userId, name }) => {
     faculties.set(socket.id, { userId, name });
     console.log(`[Server] Faculty joined: ${name}, socketId: ${socket.id}`);
 
-    const activeStudents = Array.from(students.entries()).map(([socketId, data]) => ({
-      name: data.name,
-      socketId,
-      userId: data.userId,
-    }));
+    const activeStudents = Array.from(students.entries()).map(
+      ([socketId, data]) => ({
+        name: data.name,
+        socketId,
+        userId: data.userId,
+      })
+    );
     console.log("[Server] Sending active students to faculty:", activeStudents);
     socket.emit("active-students", activeStudents);
   });
 
   socket.on("signal", ({ to, data }) => {
-    console.log(`[Server] Signal from ${socket.id} to ${to}, type: ${data?.type || 'candidate'}`);
+    console.log(
+      `[Server] Signal from ${socket.id} to ${to}, type: ${
+        data?.type || "candidate"
+      }`
+    );
     io.to(to).emit("signal", { from: socket.id, data });
   });
 
@@ -86,14 +96,15 @@ io.on("connection", (socket) => {
   //   });
   // });
 
-
   // Chat from student
   socket.on("chat-to-all", ({ message, sender }) => {
     console.log(`[Server] Chat from ${sender}: ${message}`);
 
     // Broadcast to all students
     students.forEach((s, sid) => {
-      io.to(sid).emit("chat-message", { message, sender });
+      if (sid !== socket.id) {
+        io.to(sid).emit("chat-message", { message, sender });
+      }
     });
 
     // Broadcast to all faculties
@@ -106,14 +117,16 @@ io.on("connection", (socket) => {
   socket.on("chat-to-all-faculty", ({ message, sender }) => {
     console.log(`[Server] Chat from faculty ${sender}: ${message}`);
 
-    // Broadcast to all students
+    // Send to all students
     students.forEach((s, sid) => {
       io.to(sid).emit("chat-message", { message, sender });
     });
 
-    // Broadcast to all faculties (including sender)
+    // Send to all faculties EXCEPT sender
     faculties.forEach((f, fid) => {
-      io.to(fid).emit("chat-message", { message, sender });
+      if (fid !== socket.id) {
+        io.to(fid).emit("chat-message", { message, sender });
+      }
     });
   });
 
@@ -135,21 +148,25 @@ io.on("connection", (socket) => {
     }
   });
 
-
-
   socket.on("disconnect", () => {
     if (students.has(socket.id)) {
       const s = students.get(socket.id);
       students.delete(socket.id);
-      console.log(`[Server] Student disconnected: ${s.name}, socketId: ${socket.id}`);
+      console.log(
+        `[Server] Student disconnected: ${s.name}, socketId: ${socket.id}`
+      );
       faculties.forEach((f, fid) =>
-        io.to(fid).emit("student-left", { socketId: socket.id, userId: s.userId })
+        io
+          .to(fid)
+          .emit("student-left", { socketId: socket.id, userId: s.userId })
       );
     }
     if (faculties.has(socket.id)) {
       const f = faculties.get(socket.id);
       faculties.delete(socket.id);
-      console.log(`[Server] Faculty disconnected: ${f.name}, socketId: ${socket.id}`);
+      console.log(
+        `[Server] Faculty disconnected: ${f.name}, socketId: ${socket.id}`
+      );
     }
   });
 });
