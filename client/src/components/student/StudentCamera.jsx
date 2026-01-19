@@ -1,10 +1,11 @@
 import { useEffect, useState, useRef } from "react";
-import { useSocket } from "../context/SocketContext";
-import { useUser } from "../context/UserContext";
+import { useSocket } from "../../context/SocketContext";
+import { useUser } from "../../context/UserContext";
 import StudentChat from "./StudentChat";
 // import useStudentHeartbeat from "./useStudentHeartbeat";
 // import useStudentVisibilityCheck from "./useStudentVisibilityCheck";
 import { Box, Button, Heading, VStack, HStack, Text } from "@chakra-ui/react";
+import StudentExam from "./StudentExam";
 
 const StudentCamera = () => {
   const { user } = useUser();
@@ -166,9 +167,10 @@ const StudentCamera = () => {
           Video is {videoOn ? "ON" : "OFF"}, Audio is {audioOn ? "ON" : "OFF"}
         </Text>
 
+        <StudentExam />
         {/* Chat */}
-        <StudentChat />
       </VStack>
+      <StudentChat />
     </Box>
   );
 };

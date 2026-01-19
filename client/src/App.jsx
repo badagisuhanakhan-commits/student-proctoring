@@ -1,8 +1,14 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, Link } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+  Link,
+} from "react-router-dom";
 import { UserProvider, useUser } from "./context/UserContext";
 import Login from "./components/Login";
-import StudentCamera from "./components/StudentCamera";
-import FacultyDashboard from "./components/FacultyDashboard";
+import StudentCamera from "./components/student/StudentCamera";
+import FacultyDashboard from "./components/faculty/FacultyDashboard";
 
 function AppRoutes() {
   const { user } = useUser();
@@ -14,12 +20,19 @@ function AppRoutes() {
     <Routes>
       <Route
         path="/"
-        element={<Navigate to={user.role === "faculty" ? "/faculty" : "/student"} />}
+        element={
+          <Navigate to={user.role === "faculty" ? "/faculty" : "/student"} />
+        }
       />
       <Route path="/student" element={<StudentCamera />} />
       <Route path="/faculty" element={<FacultyDashboard />} />
       {/* Optional: catch all redirect */}
-      <Route path="*" element={<Navigate to={user.role === "faculty" ? "/faculty" : "/student"} />} />
+      <Route
+        path="*"
+        element={
+          <Navigate to={user.role === "faculty" ? "/faculty" : "/student"} />
+        }
+      />
     </Routes>
   );
 }

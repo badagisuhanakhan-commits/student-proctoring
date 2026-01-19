@@ -1,6 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useSocket } from "../context/SocketContext";
-import { useUser } from "../context/UserContext";
 import {
   Box,
   Button,
@@ -12,6 +10,8 @@ import {
   Collapse,
 } from "@chakra-ui/react";
 import { ChatIcon, CloseIcon } from "@chakra-ui/icons";
+import { useSocket } from "@/context/SocketContext";
+import { useUser } from "@/context/UserContext";
 
 const FacultyChat = () => {
   const { user } = useUser();

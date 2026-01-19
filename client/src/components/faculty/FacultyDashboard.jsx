@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { useSocket } from "../context/SocketContext";
-import { useUser } from "../context/UserContext";
+import { useSocket } from "../../context/SocketContext";
+import { useUser } from "../../context/UserContext";
 import FacultyChat from "./FacultyChat";
 import {
   Box,
@@ -12,7 +12,10 @@ import {
   VStack,
   Flex,
   Divider,
+  Button,
 } from "@chakra-ui/react";
+import CreateQuestionPaper from "./CreateQuestionPaper";
+import { LeaderBoard } from "./LeaderBoard";
 
 const FacultyDashboard = () => {
   const { user } = useUser();
@@ -24,6 +27,26 @@ const FacultyDashboard = () => {
   const peerConnections = useRef({});
   const [studentVideoStatus, setStudentVideoStatus] = useState({}); // Video on/off
   const [studentTabStatus, setStudentTabStatus] = useState({}); // Tab active/inactive
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [paperId, setPaperId] = useState(null);
+
+  // fetch last leaderboard on mount
+  useEffect(() => {
+    const fetchLastLeaderboard = async () => {
+      try {
+        const res = await fetch(
+          "http://localhost:5000/api/question-paper/last-leaderboard",
+        );
+        const data = await res.json();
+        setLeaderboard(data.leaderboard);
+        setPaperId(data.paperId);
+      } catch (err) {
+        console.error("Failed to fetch last leaderboard", err);
+      }
+    };
+
+    fetchLastLeaderboard();
+  }, []);
 
   useEffect(() => {
     if (!socket || !user) return;
@@ -45,8 +68,8 @@ const FacultyDashboard = () => {
         if (event.streams && event.streams[0]) {
           setStudents((prev) =>
             prev.map((s) =>
-              s.socketId === socketId ? { ...s, stream: event.streams[0] } : s
-            )
+              s.socketId === socketId ? { ...s, stream: event.streams[0] } : s,
+            ),
           );
         }
       };
@@ -68,7 +91,7 @@ const FacultyDashboard = () => {
     // --- Socket Events ---
     socket.on("active-students", (studentsList) => {
       setStudents(
-        studentsList.map((s) => ({ ...s, stream: null, audioOn: true }))
+        studentsList.map((s) => ({ ...s, stream: null, audioOn: true })),
       );
       studentsList.forEach(createOffer);
     });
@@ -116,12 +139,21 @@ const FacultyDashboard = () => {
     socket.on("student-audio-toggle", ({ socketId, audioOn }) => {
       console.log(`[Faculty] Student ${socketId} audio toggled: ${audioOn}`);
       setStudents((prev) =>
-        prev.map((s) => (s.socketId === socketId ? { ...s, audioOn } : s))
+        prev.map((s) => (s.socketId === socketId ? { ...s, audioOn } : s)),
       );
     });
 
     socket.on("student-tab-status", ({ socketId, visible }) => {
       setStudentTabStatus((prev) => ({ ...prev, [socketId]: visible }));
+    });
+
+    socket.on("leaderboard-update", (entry) => {
+      console.log(`[Faculty] Leaderboard update received:`, entry, paperId);
+      if (entry.paperId !== paperId) return; // ignore old/new papers
+      setLeaderboard((prev) => {
+        const other = prev.filter((e) => e.studentId !== entry.studentId);
+        return [...other, entry].sort((a, b) => b.score - a.score);
+      });
     });
 
     return () => {
@@ -133,9 +165,12 @@ const FacultyDashboard = () => {
       socket.off("student-video-toggle");
       socket.off("student-audio-toggle");
       socket.off("student-tab-status");
+      socket.off("leaderboard-update");
       Object.values(peerConnections.current).forEach((pc) => pc.close());
     };
   }, [socket, user]);
+
+  console.log("updated leaderboard:", leaderboard);
 
   return (
     <Box minH="100vh" bg="#5f9ea0" p={6}>
@@ -224,6 +259,12 @@ const FacultyDashboard = () => {
           );
         })}
       </Grid>
+
+      <Divider mb={6} />
+      <LeaderBoard leaderboard={leaderboard} />
+      <Divider my={6} />
+      <CreateQuestionPaper />
+      <Divider my={6} />
 
       {/* Chat Section */}
       <FacultyChat

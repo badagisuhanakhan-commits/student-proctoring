@@ -9,23 +9,25 @@ import cors from "cors";
 
 import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
+import questionPaperRoutes from "./routes/question-paper.js";
 
 const app = express();
 app.use(
   cors({
     origin: "*",
-  })
+  }),
 );
 app.use(express.json());
 
 connectDB();
 app.use("/api/auth", authRoutes);
+app.use("/api/question-paper", questionPaperRoutes);
 
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
+export const io = new Server(server, { cors: { origin: "*" } });
 
 const students = new Map(); // socketId -> { userId, name }
-const faculties = new Map(); // socketId -> { userId, name }
+export const faculties = new Map(); // socketId -> { userId, name }
 
 io.on("connection", (socket) => {
   console.log("[Server] Socket connected:", socket.id);
@@ -63,7 +65,7 @@ io.on("connection", (socket) => {
         name: data.name,
         socketId,
         userId: data.userId,
-      })
+      }),
     );
     console.log("[Server] Sending active students to faculty:", activeStudents);
     socket.emit("active-students", activeStudents);
@@ -73,7 +75,7 @@ io.on("connection", (socket) => {
     console.log(
       `[Server] Signal from ${socket.id} to ${to}, type: ${
         data?.type || "candidate"
-      }`
+      }`,
     );
     io.to(to).emit("signal", { from: socket.id, data });
   });
@@ -130,6 +132,33 @@ io.on("connection", (socket) => {
     });
   });
 
+  socket.on("publish-question-paper", (paper) => {
+    console.log(
+      `[Server] Question paper published: ${paper.title} by ${paper.facultyName}`,
+    );
+    // Notify all students about new question paper
+    students.forEach((s, sid) => {
+      io.to(sid).emit("new-question-paper", paper);
+    });
+  });
+
+  // When student submits answers
+  socket.on("submit-answers", ({ paperId, studentId, studentName, score }) => {
+    console.log(
+      `[Server] Answers submitted by ${studentName} for paper ${paperId} with score ${score}`,
+    );
+    // broadcast to all faculties
+    faculties.forEach((f, fid) => {
+      io.to(fid).emit("leaderboard-update", {
+        studentId,
+        studentName,
+        paperId,
+        score,
+        submittedAt: Date.now(),
+      });
+    });
+  });
+
   socket.on("student-heartbeat", () => {
     // we can update lastActive time
     if (students.has(socket.id)) {
@@ -153,19 +182,19 @@ io.on("connection", (socket) => {
       const s = students.get(socket.id);
       students.delete(socket.id);
       console.log(
-        `[Server] Student disconnected: ${s.name}, socketId: ${socket.id}`
+        `[Server] Student disconnected: ${s.name}, socketId: ${socket.id}`,
       );
       faculties.forEach((f, fid) =>
         io
           .to(fid)
-          .emit("student-left", { socketId: socket.id, userId: s.userId })
+          .emit("student-left", { socketId: socket.id, userId: s.userId }),
       );
     }
     if (faculties.has(socket.id)) {
       const f = faculties.get(socket.id);
       faculties.delete(socket.id);
       console.log(
-        `[Server] Faculty disconnected: ${f.name}, socketId: ${socket.id}`
+        `[Server] Faculty disconnected: ${f.name}, socketId: ${socket.id}`,
       );
     }
   });
